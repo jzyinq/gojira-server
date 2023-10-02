@@ -2,7 +2,10 @@ module gojira-auth
 
 go 1.21
 
-require golang.org/x/oauth2 v0.12.0
+require (
+	github.com/joho/godotenv v1.5.1
+	golang.org/x/oauth2 v0.12.0
+)
 
 require (
 	cloud.google.com/go/compute v1.20.1 // indirect
