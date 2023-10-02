@@ -1,16 +1,14 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 	"log"
 	"net/http"
 	"os"
 	"sync"
-
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 )
 
 const (
@@ -34,39 +32,30 @@ func NewTokenStore() *TokenStore {
 	return &TokenStore{store: make(map[string]*oauth2.Token)}
 }
 
-func LoggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("Received request: %s %s", r.Method, r.URL)
-		next.ServeHTTP(w, r)
-	})
-}
-
-func handleStart(cfg *Config) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		identifier := r.URL.Query().Get("identifier")
+func handleStart(cfg *Config) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		identifier := c.DefaultQuery("identifier", "")
 		if identifier == "" {
-			http.Error(w, missingIdentifierMsg, http.StatusBadRequest)
+			c.JSON(http.StatusBadRequest, gin.H{"error": missingIdentifierMsg})
 			return
 		}
-
 		authURL := cfg.OAuth2Config.AuthCodeURL(identifier, oauth2.AccessTypeOffline)
-		http.Redirect(w, r, authURL, http.StatusFound)
+		c.Redirect(http.StatusFound, authURL)
 	}
 }
 
-func handleCallback(cfg *Config, tokenStore *TokenStore) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		code := r.URL.Query().Get("code")
+func handleCallback(cfg *Config, tokenStore *TokenStore) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		code := c.DefaultQuery("code", "")
 		if code == "" {
-			http.Error(w, missingCodeMsg, http.StatusBadRequest)
+			c.JSON(http.StatusBadRequest, gin.H{"error": missingCodeMsg})
 			return
 		}
 
-		identifier := r.URL.Query().Get("state")
-		token, err := cfg.OAuth2Config.Exchange(r.Context(), code)
+		identifier := c.DefaultQuery("state", "")
+		token, err := cfg.OAuth2Config.Exchange(c, code)
 		if err != nil {
-			fmt.Printf("Unable to retrieve token from web: %v\n", err)
-			http.Error(w, failedTokenExchangeMsg, http.StatusInternalServerError)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": failedTokenExchangeMsg})
 			return
 		}
 
@@ -76,15 +65,15 @@ func handleCallback(cfg *Config, tokenStore *TokenStore) http.HandlerFunc {
 			tokenStore.mu.Unlock()
 		}
 
-		w.Write([]byte(authorizationSuccessMsg))
+		c.String(http.StatusOK, authorizationSuccessMsg)
 	}
 }
 
-func handleTokenFetch(tokenStore *TokenStore) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		identifier := r.URL.Query().Get("identifier")
+func handleTokenFetch(tokenStore *TokenStore) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		identifier := c.DefaultQuery("identifier", "")
 		if identifier == "" {
-			http.Error(w, missingIdentifierMsg, http.StatusBadRequest)
+			c.JSON(http.StatusBadRequest, gin.H{"error": missingIdentifierMsg})
 			return
 		}
 
@@ -93,25 +82,17 @@ func handleTokenFetch(tokenStore *TokenStore) http.HandlerFunc {
 		tokenStore.mu.Unlock()
 
 		if !found {
-			http.Error(w, "Identifier not found", http.StatusNotFound)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Identifier not found"})
 			return
 		}
 
-		tokenJSON, err := json.Marshal(token)
-		if err != nil {
-			http.Error(w, failedJSONResponseMsg, http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(tokenJSON)
+		c.JSON(http.StatusOK, token)
 	}
 }
 
 func main() {
 	// Load environment variables
-	err := godotenv.Load()
-	if err != nil {
+	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error loading .env file")
 	}
 
@@ -127,9 +108,15 @@ func main() {
 
 	tokenStore := NewTokenStore()
 
-	http.Handle("/start", LoggingMiddleware(http.HandlerFunc(handleStart(cfg))))
-	http.Handle("/callback", LoggingMiddleware(http.HandlerFunc(handleCallback(cfg, tokenStore))))
-	http.Handle("/fetch_token", LoggingMiddleware(http.HandlerFunc(handleTokenFetch(tokenStore))))
+	r := gin.Default()
 
-	log.Fatal(http.ListenAndServe(":"+os.Getenv("HTTP_PORT"), nil))
+	r.GET("/start", handleStart(cfg))
+	r.GET("/callback", handleCallback(cfg, tokenStore))
+	r.GET("/fetch_token", handleTokenFetch(tokenStore))
+
+	port := os.Getenv("HTTP_PORT")
+	if port == "" {
+		port = "8080" // Default port
+	}
+	r.Run(":" + port)
 }
