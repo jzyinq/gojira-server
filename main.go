@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 	"golang.org/x/oauth2"
@@ -30,6 +31,13 @@ type TokenStore struct {
 
 func NewTokenStore() *TokenStore {
 	return &TokenStore{store: make(map[string]*oauth2.Token)}
+}
+
+func handleMain() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		asciiGojira := "              _ _           \n             (_|_)          \n   __ _  ___  _ _ _ __ __ _ \n  / _` |/ _ \\| | | '__/ _` |\n | (_| | (_) | | | | | (_| |\n  \\__, |\\___/| |_|_|  \\__,_|\n   __/ |    _/ |            \n  |___/    |__/             "
+		c.String(http.StatusOK, fmt.Sprintf("%s\n\nSimple oauth server to handle google api authentication for\nhttps://github.com/jzyinq/gojira\nref: https://github.com/jzyinq/gojira-server", asciiGojira))
+	}
 }
 
 func handleStart(cfg *Config) gin.HandlerFunc {
@@ -110,6 +118,7 @@ func main() {
 
 	r := gin.Default()
 
+	r.GET("/", handleMain())
 	r.GET("/start", handleStart(cfg))
 	r.GET("/callback", handleCallback(cfg, tokenStore))
 	r.GET("/fetch_token", handleTokenFetch(tokenStore))
