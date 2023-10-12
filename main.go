@@ -93,7 +93,7 @@ func handleTokenFetch(tokenStore *TokenStore) gin.HandlerFunc {
 func main() {
 	// Load environment variables
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+		log.Print("No .env file detected - using existing env variables.")
 	}
 
 	cfg := &Config{

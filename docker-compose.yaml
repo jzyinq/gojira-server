@@ -1,0 +1,9 @@
+version: "3.7"
+services:
+  gojira-auth-server:
+    image: jzyinq/gojira-oauth-server
+    build: .
+    ports:
+      - "8080:8080"
+    env_file:
+      - .env
