@@ -1,7 +1,7 @@
 version: "3.7"
 services:
   gojira-auth-server:
-    image: jzyinq/gojira-oauth-server
+    image: jzyinq/oauth-cli-backend
     build: .
     ports:
       - "8080:8080"
