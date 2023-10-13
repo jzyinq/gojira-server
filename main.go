@@ -127,5 +127,8 @@ func main() {
 	if port == "" {
 		port = "8080" // Default port
 	}
-	r.Run(":" + port)
+	err := r.Run(":" + port)
+	if err != nil {
+		log.Fatalf("%s", err)
+	}
 }
