@@ -85,6 +85,9 @@ func handleTokenFetch(tokenStore *TokenStore) gin.HandlerFunc {
 
 		tokenStore.mu.Lock()
 		token, found := tokenStore.store[identifier]
+		if found {
+			delete(tokenStore.store, identifier)
+		}
 		tokenStore.mu.Unlock()
 
 		if !found {
@@ -97,7 +100,6 @@ func handleTokenFetch(tokenStore *TokenStore) gin.HandlerFunc {
 }
 
 func main() {
-	// Load environment variables
 	if err := godotenv.Load(); err != nil {
 		log.Print("No .env file detected - using existing env variables.")
 	}
